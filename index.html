@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Prenota il tagliando della tua auto presso Donolauto SRL - Legnaro (PD)">
+<title>Prenota Tagliando · Donolauto</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          ink:     '#0A0A0A',
+          muted:   '#6B6B6B',
+          line:    '#E5E5E5',
+          soft:    '#F5F5F4',
+          red:     '#D63B27',
+          redDk:   '#A52A1A',
+          green:   '#1E9E4A',
+        },
+        fontFamily: { sans: ['Manrope', 'system-ui', 'sans-serif'] },
+      }
+    }
+  }
+</script>
+<style>
+  :root { color-scheme: light; }
+  body { font-family: 'Manrope', sans-serif; color: #0A0A0A; background: #FAFAF9; -webkit-font-smoothing: antialiased; }
+
+  /* Calendario — celle giorni */
+  .day {
+    aspect-ratio: 1 / 1;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 500;
+    font-size: 0.95rem;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    transition: all .15s ease;
+    position: relative;
+    cursor: pointer;
+    user-select: none;
+  }
+  .day.off    { color: #C9C9C8; cursor: not-allowed; }
+  .day.booked { color: #9A9A99; cursor: not-allowed; background: #F5F5F4; }
+  .day.booked::after {
+    content: ''; position: absolute; inset: 22%;
+    border-top: 1.5px solid #C9C9C8; transform: rotate(-45deg);
+  }
+  .day.available { background: #FFF; border-color: #E5E5E5; color: #0A0A0A; }
+  .day.available:hover { border-color: #D63B27; color: #D63B27; transform: translateY(-1px); }
+  .day.selected { background: #0A0A0A; color: #FFF; border-color: #0A0A0A; }
+  .day.today { box-shadow: inset 0 0 0 2px rgba(214,59,39,.18); }
+
+  /* Slot orari */
+  .slot {
+    padding: .65rem .4rem;
+    font-weight: 500;
+    font-size: 0.95rem;
+    border: 1px solid #E5E5E5;
+    background: #FFF;
+    border-radius: 8px;
+    text-align: center;
+    transition: all .15s ease;
+    cursor: pointer;
+  }
+  .slot:hover:not([disabled]) { border-color: #D63B27; color: #D63B27; }
+  .slot.selected { background: #0A0A0A; color: #FFF; border-color: #0A0A0A; }
+  .slot[disabled] { opacity: .35; cursor: not-allowed; }
+
+  /* Input */
+  .field {
+    width: 100%;
+    background: #FFF;
+    border: 1px solid #E5E5E5;
+    padding: .7rem .85rem;
+    font-family: inherit;
+    font-size: 0.95rem;
+    color: #0A0A0A;
+    border-radius: 8px;
+    outline: none;
+    transition: border-color .15s ease, box-shadow .15s ease;
+  }
+  .field:focus { border-color: #0A0A0A; box-shadow: 0 0 0 3px rgba(10,10,10,.08); }
+  .field::placeholder { color: #B0B0B0; }
+  .lbl { font-size: .78rem; font-weight: 600; color: #3A3A3A; }
+  .field.invalid { border-color: #D63B27; }
+  .field.invalid:focus { box-shadow: 0 0 0 3px rgba(214,59,39,.15); }
+
+  /* Card */
+  .card {
+    background: #FFF;
+    border: 1px solid #E5E5E5;
+    border-radius: 16px;
+    padding: 1.75rem;
+  }
+  @media (min-width: 768px) { .card { padding: 2.25rem; } }
+
+  /* Bottone primario */
+  .btn-primary {
+    background: #D63B27; color: #FFF;
+    padding: 1rem 1.75rem; border-radius: 10px;
+    font-weight: 700; font-size: 1rem;
+    transition: all .15s ease; cursor: pointer;
+    border: none;
+    display: inline-flex; align-items: center; justify-content: center; gap: .5rem;
+  }
+  .btn-primary:hover:not(:disabled) { background: #A52A1A; }
+  .btn-primary:disabled { background: #D6D6D5; color: #FFF; cursor: not-allowed; }
+
+  .btn-nav {
+    background: transparent;
+    padding: .45rem .7rem;
+    font-size: .85rem; font-weight: 500; color: #3A3A3A;
+    border: 1px solid #E5E5E5;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all .15s ease;
+  }
+  .btn-nav:hover:not(:disabled) { border-color: #0A0A0A; color: #0A0A0A; }
+  .btn-nav:disabled { opacity: .3; cursor: not-allowed; }
+
+  /* Fade in */
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  .fade-up { animation: fadeUp .4s ease both; }
+
+  /* Spinner */
+  .spinner {
+    width: 16px; height: 16px;
+    border: 2px solid rgba(255,255,255,.35);
+    border-top-color: #FFF;
+    border-radius: 50%;
+    animation: spin .7s linear infinite;
+    display: inline-block;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 10px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #D6D6D5; border-radius: 5px; }
+</style>
+</head>
+<body class="min-h-screen">
+
+<!-- HEADER -->
+<header class="bg-white border-b border-line">
+  <div class="max-w-5xl mx-auto px-5 md:px-8 py-4 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-lg bg-ink flex items-center justify-center">
+        <span class="text-white font-extrabold text-lg leading-none">D</span>
+      </div>
+      <div class="leading-tight">
+        <div class="font-bold text-base">Donolauto</div>
+        <div class="text-[0.68rem] text-muted">Officina · Legnaro (PD)</div>
+      </div>
+    </div>
+    <a href="tel:049641274" class="flex items-center gap-2 text-sm font-medium hover:text-red transition-colors">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 16.92z"/>
+      </svg>
+      <span class="hidden sm:inline">049 641274</span>
+    </a>
+  </div>
+</header>
+
+<!-- HERO -->
+<section id="heroSection" class="max-w-5xl mx-auto px-5 md:px-8 pt-10 md:pt-14 pb-8 fade-up">
+  <div class="inline-block px-3 py-1 rounded-full bg-red/10 text-red text-xs font-semibold tracking-wide mb-4">
+    PRENOTAZIONE ONLINE
+  </div>
+  <h1 class="text-4xl md:text-5xl font-extrabold leading-tight tracking-tight">
+    Prenota il tuo tagliando.
+  </h1>
+  <p class="mt-3 text-muted text-base md:text-lg max-w-xl">
+    Compila i dati, scegli giorno e ora. Riceverai la conferma via email in pochi secondi.
+  </p>
+</section>
+
+<!-- MAIN -->
+<main id="bookingView" class="max-w-5xl mx-auto px-5 md:px-8 pb-16">
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+    <!-- FORM -->
+    <div class="card fade-up" style="animation-delay:.05s">
+      <h2 class="text-xl font-bold mb-1">I tuoi dati</h2>
+      <p class="text-sm text-muted mb-6">Tutti i campi sono obbligatori, esclusa la nota.</p>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label class="lbl block mb-1.5" for="nome">Nome</label>
+          <input id="nome" class="field" placeholder="Mario" required>
+        </div>
+        <div>
+          <label class="lbl block mb-1.5" for="cognome">Cognome</label>
+          <input id="cognome" class="field" placeholder="Rossi" required>
+        </div>
+        <div>
+          <label class="lbl block mb-1.5" for="email">Email</label>
+          <input id="email" type="email" class="field" placeholder="nome@email.it" required>
+        </div>
+        <div>
+          <label class="lbl block mb-1.5" for="telefono">Telefono</label>
+          <input id="telefono" type="tel" class="field" placeholder="+39 ..." required>
+        </div>
+        <div>
+          <label class="lbl block mb-1.5" for="targa">Targa</label>
+          <input id="targa" class="field uppercase tracking-widest" placeholder="AA123BB" maxlength="8" required>
+        </div>
+        <div>
+          <label class="lbl block mb-1.5" for="km">Chilometri</label>
+          <input id="km" type="number" class="field" placeholder="75000" min="0" required>
+        </div>
+      </div>
+
+      <div class="mt-4">
+        <label class="lbl block mb-1.5" for="note">Note <span class="text-muted font-normal">(opzionale)</span></label>
+        <textarea id="note" class="field resize-none" rows="3" placeholder="Es. rumore sospeso anteriore, richiesta sostituzione pastiglie…"></textarea>
+      </div>
+    </div>
+
+    <!-- CALENDARIO -->
+    <div class="card fade-up" style="animation-delay:.1s">
+      <h2 class="text-xl font-bold mb-1">Data e ora</h2>
+      <p class="text-sm text-muted mb-6">Seleziona il giorno, poi l'orario.</p>
+
+      <!-- Navigazione mese -->
+      <div class="flex items-center justify-between mb-4">
+        <button id="prevMonth" class="btn-nav">← Prec.</button>
+        <div id="monthLabel" class="font-bold text-base capitalize"></div>
+        <button id="nextMonth" class="btn-nav">Succ. →</button>
+      </div>
+
+      <!-- Intestazione giorni settimana -->
+      <div class="grid grid-cols-7 gap-1 mb-1 text-[0.68rem] font-semibold text-muted text-center">
+        <div class="py-1">LUN</div>
+        <div class="py-1">MAR</div>
+        <div class="py-1">MER</div>
+        <div class="py-1">GIO</div>
+        <div class="py-1">VEN</div>
+        <div class="py-1">SAB</div>
+        <div class="py-1">DOM</div>
+      </div>
+
+      <!-- Griglia giorni -->
+      <div id="daysGrid" class="grid grid-cols-7 gap-1"></div>
+
+      <!-- Legenda -->
+      <div class="flex flex-wrap items-center gap-x-4 gap-y-2 mt-4 text-xs text-muted">
+        <div class="flex items-center gap-1.5"><span class="inline-block w-3 h-3 bg-ink rounded"></span>selezionato</div>
+        <div class="flex items-center gap-1.5"><span class="inline-block w-3 h-3 bg-white border border-line rounded"></span>disponibile</div>
+        <div class="flex items-center gap-1.5"><span class="inline-block w-3 h-3 bg-soft rounded"></span>occupato</div>
+      </div>
+
+      <!-- Slot orari -->
+      <div id="slotsWrap" class="hidden mt-6 pt-6 border-t border-line">
+        <div class="flex items-center justify-between mb-4 gap-3">
+          <div class="text-sm font-semibold">Orario disponibile</div>
+          <div id="selectedDayLabel" class="text-xs md:text-sm text-muted text-right"></div>
+        </div>
+
+        <div id="morningBlock" class="mb-4">
+          <div class="text-[0.7rem] font-bold text-red uppercase tracking-wider mb-2">Mattina</div>
+          <div id="morningSlots" class="grid grid-cols-3 sm:grid-cols-4 gap-2"></div>
+        </div>
+        <div id="afternoonBlock">
+          <div class="text-[0.7rem] font-bold text-red uppercase tracking-wider mb-2">Pomeriggio</div>
+          <div id="afternoonSlots" class="grid grid-cols-3 sm:grid-cols-4 gap-2"></div>
+        </div>
+      </div>
+
+      <!-- Info regole -->
+      <div class="mt-6 pt-6 border-t border-line space-y-1.5 text-xs text-muted leading-relaxed">
+        <p>🕘 Orari <span class="font-semibold text-ink">9:30–12:30</span> · <span class="font-semibold text-ink">15:30–18:00</span></p>
+        <p>📅 Un tagliando al giorno · chiusi lunedì mattina, sabato e domenica</p>
+        <p>⏱ Prenotazione con almeno <span class="font-semibold text-ink">3 giorni di anticipo</span></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIEPILOGO + CTA -->
+  <div class="mt-6 card fade-up" style="animation-delay:.15s">
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-5">
+      <div id="selezioneBox" class="flex-1 text-muted">
+        <div class="text-sm">Nessun appuntamento selezionato</div>
+        <div class="text-xs mt-0.5">Scegli giorno e orario dal calendario</div>
+      </div>
+      <button id="btnConferma" class="btn-primary w-full md:w-auto" disabled>
+        <span id="btnLabel">Conferma prenotazione</span>
+      </button>
+    </div>
+    <p class="text-[0.72rem] text-muted mt-4 leading-relaxed">
+      Confermando accetti il trattamento dei dati ai sensi del Regolamento UE 2016/679 per la sola gestione dell'appuntamento.
+    </p>
+  </div>
+</main>
+
+<!-- VIEW SUCCESSO -->
+<section id="successView" class="hidden max-w-xl mx-auto px-5 md:px-8 py-20 text-center fade-up">
+  <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green/15 mb-6">
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#1E9E4A" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="20 6 9 17 4 12"/>
+    </svg>
+  </div>
+  <h2 class="text-3xl md:text-4xl font-extrabold tracking-tight mb-3">Prenotazione confermata</h2>
+  <p class="text-muted text-base leading-relaxed">
+    Grazie <span id="successName" class="font-semibold text-ink">cliente</span>. Abbiamo inviato il riepilogo a <span id="successEmail" class="font-semibold text-ink break-words">—</span>
+  </p>
+  <div class="mt-8 card text-left">
+    <div class="text-xs font-bold text-muted uppercase tracking-wider mb-3">Il tuo appuntamento</div>
+    <div id="successRecap" class="text-lg font-semibold leading-relaxed"></div>
+  </div>
+  <div class="mt-8 text-sm text-muted">
+    Per modifiche o disdette: <a href="tel:049641274" class="text-red font-semibold hover:underline">049 641274</a>
+  </div>
+</section>
+
+<!-- TOAST ERRORE -->
+<div id="errorToast" class="hidden fixed bottom-6 left-1/2 -translate-x-1/2 bg-ink text-white px-5 py-3 rounded-lg shadow-xl z-50 max-w-sm text-sm font-medium">
+  <span id="errorText"></span>
+</div>
+
+<!-- FOOTER -->
+<footer class="bg-white border-t border-line mt-10">
+  <div class="max-w-5xl mx-auto px-5 md:px-8 py-6 text-xs text-muted flex flex-col md:flex-row md:justify-between gap-2">
+    <div>© Donolauto SRL · Via Romea 121, Legnaro (PD) · P.IVA 05258940286</div>
+    <div>Officina autorizzata multimarca</div>
+  </div>
+</footer>
+
+<script>
+/* ============================================================
+   CONFIGURAZIONE BACKEND
+   Dopo aver creato lo script Apps Script (vedi README),
+   sostituisci il valore qui sotto con l'URL della Web App.
+   ============================================================ */
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw00DKVvo58LUdVUGPdvTvNSUErIiEMqUZIxoVQKx78qaLOFsVJVM6yWhQe8QAw-hcF/exec';
+
+/* ========== STATO ========== */
+const state = {
+  currentMonth: new Date(),
+  selectedDate: null,      // 'YYYY-MM-DD'
+  selectedSlot: null,      // 'HH:MM'
+  bookedDates: new Set(),
+  loading: false,
+};
+
+const MORNING_SLOTS   = ['09:30', '10:00', '10:30', '11:00', '11:30', '12:00'];
+const AFTERNOON_SLOTS = ['15:30', '16:00', '16:30', '17:00', '17:30'];
+
+const MESI = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
+
+// Anticipo minimo: oggi + 3 giorni è il primo prenotabile
+const MIN_DAYS_AHEAD = 3;
+
+/* ========== UTILS ========== */
+const $ = (id) => document.getElementById(id);
+const pad = (n) => String(n).padStart(2, '0');
+const fmtDateISO = (d) => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const parseDateISO = (iso) => {
+  const [y,m,d] = iso.split('-').map(Number);
+  return new Date(y, m-1, d);
+};
+const fmtDateHuman = (iso) => {
+  const d = parseDateISO(iso);
+  const giorni = ['domenica','lunedì','martedì','mercoledì','giovedì','venerdì','sabato'];
+  return `${giorni[d.getDay()]} ${d.getDate()} ${MESI[d.getMonth()].toLowerCase()} ${d.getFullYear()}`;
+};
+const startOfDay = (d) => { const x = new Date(d); x.setHours(0,0,0,0); return x; };
+
+/* Domenica=0, Lunedì=1, Sabato=6 */
+const isDayClosed = (date) => date.getDay() === 0 || date.getDay() === 6;
+const isMondayOnlyAfternoon = (date) => date.getDay() === 1;
+
+/* ========== CARICAMENTO PRENOTAZIONI ========== */
+async function loadBookedDates() {
+  if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL.includes('INSERISCI_QUI')) {
+    console.warn('[Donolauto] Apps Script URL non configurato: modalità demo.');
+    return;
+  }
+  try {
+    const res = await fetch(APPS_SCRIPT_URL + '?action=list');
+    const data = await res.json();
+    if (data && Array.isArray(data.booked)) {
+      state.bookedDates = new Set(data.booked);
+      renderCalendar();
+    }
+  } catch (err) {
+    console.error('[Donolauto] Errore caricamento prenotazioni:', err);
+  }
+}
+
+/* ========== RENDER CALENDARIO ========== */
+function renderCalendar() {
+  const month = state.currentMonth.getMonth();
+  const year  = state.currentMonth.getFullYear();
+  $('monthLabel').textContent = `${MESI[month]} ${year}`;
+
+  // Disabilita "Prec." se siamo al mese corrente (o prima)
+  const now = new Date();
+  const currMonthFirst = new Date(year, month, 1);
+  const nowMonthFirst  = new Date(now.getFullYear(), now.getMonth(), 1);
+  $('prevMonth').disabled = currMonthFirst <= nowMonthFirst;
+
+  const firstDay = new Date(year, month, 1);
+  const lastDay  = new Date(year, month+1, 0);
+  const startOffset = (firstDay.getDay() + 6) % 7; // lunedì-first
+
+  const grid = $('daysGrid');
+  grid.innerHTML = '';
+
+  for (let i = 0; i < startOffset; i++) {
+    grid.appendChild(document.createElement('div'));
+  }
+
+  const today = startOfDay(new Date());
+  const minBookable = new Date(today);
+  minBookable.setDate(minBookable.getDate() + MIN_DAYS_AHEAD);
+
+  for (let d = 1; d <= lastDay.getDate(); d++) {
+    const date = new Date(year, month, d);
+    const iso  = fmtDateISO(date);
+    const cell = document.createElement('div');
+    cell.className = 'day';
+    cell.textContent = d;
+
+    const isTooSoon = startOfDay(date) < minBookable;
+    const isClosed  = isDayClosed(date);
+    const isBooked  = state.bookedDates.has(iso);
+    const isToday   = startOfDay(date).getTime() === today.getTime();
+
+    if (isToday) cell.classList.add('today');
+
+    if (isTooSoon || isClosed) {
+      cell.classList.add('off');
+    } else if (isBooked) {
+      cell.classList.add('booked');
+      cell.title = 'Giorno già prenotato';
+    } else {
+      cell.classList.add('available');
+      if (state.selectedDate === iso) cell.classList.add('selected');
+      cell.addEventListener('click', () => selectDay(iso));
+    }
+    grid.appendChild(cell);
+  }
+}
+
+/* ========== SELEZIONE GIORNO ========== */
+function selectDay(iso) {
+  state.selectedDate = iso;
+  state.selectedSlot = null;
+  renderCalendar();
+  renderSlots();
+  updateSummary();
+  if (window.innerWidth < 1024) {
+    setTimeout(() => $('slotsWrap').scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 100);
+  }
+}
+
+/* ========== RENDER SLOT ORARI ========== */
+function renderSlots() {
+  const wrap = $('slotsWrap');
+  if (!state.selectedDate) { wrap.classList.add('hidden'); return; }
+  wrap.classList.remove('hidden');
+
+  const date = parseDateISO(state.selectedDate);
+  $('selectedDayLabel').textContent = fmtDateHuman(state.selectedDate);
+
+  const mondayOnly = isMondayOnlyAfternoon(date);
+
+  const mBlock = $('morningBlock');
+  const mWrap  = $('morningSlots');
+  mWrap.innerHTML = '';
+  if (mondayOnly) {
+    mBlock.classList.add('hidden');
+  } else {
+    mBlock.classList.remove('hidden');
+    MORNING_SLOTS.forEach(s => mWrap.appendChild(makeSlotBtn(s)));
+  }
+
+  const aWrap = $('afternoonSlots');
+  aWrap.innerHTML = '';
+  AFTERNOON_SLOTS.forEach(s => aWrap.appendChild(makeSlotBtn(s)));
+}
+
+function makeSlotBtn(time) {
+  const btn = document.createElement('button');
+  btn.className = 'slot';
+  btn.type = 'button';
+  btn.textContent = time;
+  if (state.selectedSlot === time) btn.classList.add('selected');
+  btn.addEventListener('click', () => {
+    state.selectedSlot = time;
+    renderSlots();
+    updateSummary();
+  });
+  return btn;
+}
+
+/* ========== RIEPILOGO + CTA ========== */
+function updateSummary() {
+  const box = $('selezioneBox');
+  const btn = $('btnConferma');
+  if (state.selectedDate && state.selectedSlot) {
+    box.innerHTML = `
+      <div class="text-xs font-bold text-muted uppercase tracking-wider mb-1">Riepilogo</div>
+      <div class="text-lg font-bold leading-tight">${fmtDateHuman(state.selectedDate)}</div>
+      <div class="text-base text-red font-semibold">ore ${state.selectedSlot}</div>
+    `;
+    box.classList.remove('text-muted');
+  } else {
+    box.innerHTML = `
+      <div class="text-sm">Nessun appuntamento selezionato</div>
+      <div class="text-xs mt-0.5">Scegli giorno e orario dal calendario</div>
+    `;
+    box.classList.add('text-muted');
+  }
+  btn.disabled = !isFormValid();
+}
+
+/* ========== VALIDAZIONE ========== */
+function isFormValid() {
+  const reqIds = ['nome','cognome','email','telefono','targa','km'];
+  for (const id of reqIds) {
+    const v = ($(id).value || '').trim();
+    if (!v) return false;
+  }
+  const email = $('email').value.trim();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return false;
+  return !!(state.selectedDate && state.selectedSlot);
+}
+
+// Feedback visivo sui campi
+['nome','cognome','email','telefono','targa','km'].forEach(id => {
+  const el = $(id);
+  el.addEventListener('blur', () => {
+    const v = (el.value || '').trim();
+    let invalid = !v;
+    if (id === 'email' && v) {
+      invalid = !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v);
+    }
+    el.classList.toggle('invalid', invalid);
+  });
+  el.addEventListener('input', () => {
+    el.classList.remove('invalid');
+    $('btnConferma').disabled = !isFormValid();
+  });
+});
+
+/* ========== NAVIGAZIONE MESE ========== */
+$('prevMonth').addEventListener('click', () => {
+  const now = new Date();
+  const currFirst = new Date(state.currentMonth.getFullYear(), state.currentMonth.getMonth(), 1);
+  const nowFirst  = new Date(now.getFullYear(), now.getMonth(), 1);
+  if (currFirst <= nowFirst) return;
+  state.currentMonth = new Date(state.currentMonth.getFullYear(), state.currentMonth.getMonth()-1, 1);
+  renderCalendar();
+});
+$('nextMonth').addEventListener('click', () => {
+  state.currentMonth = new Date(state.currentMonth.getFullYear(), state.currentMonth.getMonth()+1, 1);
+  renderCalendar();
+});
+
+/* ========== CONFERMA ========== */
+$('btnConferma').addEventListener('click', async () => {
+  if (!isFormValid() || state.loading) return;
+  state.loading = true;
+  const btn = $('btnConferma');
+  const lbl = $('btnLabel');
+  const origLabel = lbl.textContent;
+  lbl.innerHTML = '<span class="spinner"></span> Invio…';
+  btn.disabled = true;
+
+  const payload = {
+    nome:     $('nome').value.trim(),
+    cognome:  $('cognome').value.trim(),
+    email:    $('email').value.trim(),
+    telefono: $('telefono').value.trim(),
+    targa:    $('targa').value.trim().toUpperCase(),
+    km:       $('km').value.trim(),
+    note:     $('note').value.trim(),
+    data:     state.selectedDate,
+    slot:     state.selectedSlot,
+  };
+
+  try {
+    if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL.includes('INSERISCI_QUI')) {
+      // Modalità demo
+      await new Promise(r => setTimeout(r, 800));
+      showSuccess(payload);
+      return;
+    }
+
+    // text/plain evita il preflight CORS su Apps Script
+    const res = await fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (data && data.success) {
+      showSuccess(payload);
+    } else {
+      throw new Error(data && data.error ? data.error : 'Errore sconosciuto');
+    }
+  } catch (err) {
+    showError(err.message || 'Si è verificato un problema. Riprova o chiamaci allo 049 641274.');
+    console.error(err);
+    lbl.textContent = origLabel;
+    btn.disabled = false;
+  } finally {
+    state.loading = false;
+  }
+});
+
+function showSuccess(payload) {
+  $('heroSection').classList.add('hidden');
+  $('bookingView').classList.add('hidden');
+  $('successView').classList.remove('hidden');
+  $('successName').textContent  = payload.nome;
+  $('successEmail').textContent = payload.email;
+  const kmFmt = Number(payload.km).toLocaleString('it-IT');
+  $('successRecap').innerHTML   = `
+    ${fmtDateHuman(payload.data)}<br>
+    <span class="text-red">ore ${payload.slot}</span><br>
+    <span class="text-sm text-muted font-normal">${payload.targa} · ${kmFmt} km</span>
+  `;
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function showError(msg) {
+  const t = $('errorToast');
+  $('errorText').textContent = msg;
+  t.classList.remove('hidden');
+  setTimeout(() => t.classList.add('hidden'), 5000);
+}
+
+/* ========== BOOT ========== */
+renderCalendar();
+updateSummary();
+loadBookedDates();
+</script>
+
+</body>
+</html>
