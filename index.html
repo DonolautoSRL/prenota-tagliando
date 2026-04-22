@@ -217,6 +217,16 @@
       </div>
 
       <div class="mt-4">
+        <label class="flex items-start gap-3 cursor-pointer select-none p-3.5 rounded-lg border border-line hover:border-ink/40 transition-colors has-[:checked]:border-red has-[:checked]:bg-red/5">
+          <input id="autoSostitutiva" type="checkbox" class="mt-0.5 w-5 h-5 accent-red cursor-pointer shrink-0">
+          <span class="flex-1">
+            <span class="block font-semibold text-sm">Richiedo auto sostitutiva</span>
+            <span class="block text-xs text-muted mt-0.5">Disponibile al costo di <span class="font-semibold text-ink">35€ al giorno</span></span>
+          </span>
+        </label>
+      </div>
+
+      <div class="mt-4">
         <label class="lbl block mb-1.5" for="note">Note <span class="text-muted font-normal">(opzionale)</span></label>
         <textarea id="note" class="field resize-none" rows="3" placeholder="Es. rumore sospeso anteriore, richiesta sostituzione pastiglie…"></textarea>
       </div>
@@ -275,7 +285,7 @@
       <!-- Info regole -->
       <div class="mt-6 pt-6 border-t border-line space-y-1.5 text-xs text-muted leading-relaxed">
         <p>🕘 Orari <span class="font-semibold text-ink">9:30–12:30</span> · <span class="font-semibold text-ink">15:30–18:00</span></p>
-        <p>📅 Un tagliando al giorno · chiusi lunedì mattina, sabato e domenica</p>
+        <p>📅 Chiusi lunedì mattina, sabato, domenica e giorni festivi</p>
         <p>⏱ Prenotazione con almeno <span class="font-semibold text-ink">3 giorni di anticipo</span></p>
       </div>
     </div>
@@ -356,6 +366,43 @@ const MESI = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','
 // Anticipo minimo: oggi + 3 giorni è il primo prenotabile
 const MIN_DAYS_AHEAD = 3;
 
+// Festività italiane a data fissa (mese-giorno)
+// 1 gen Capodanno · 6 gen Epifania · 25 apr Liberazione · 1 mag Lavoratori
+// 2 giu Repubblica · 15 ago Ferragosto · 1 nov Ognissanti
+// 8 dic Immacolata · 25 dic Natale · 26 dic Santo Stefano
+const FIXED_HOLIDAYS = new Set([
+  '01-01','01-06','04-25','05-01','06-02','08-15','11-01','12-08','12-25','12-26'
+]);
+
+// Calcolo del lunedì di Pasqua (Pasquetta) — festivo mobile. Algoritmo di Gauss.
+function easterMondayISO(year) {
+  const a = year % 19;
+  const b = Math.floor(year / 100);
+  const c = year % 100;
+  const d = Math.floor(b / 4);
+  const e = b % 4;
+  const f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4);
+  const k = c % 4;
+  const L = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * L) / 451);
+  const month = Math.floor((h + L - 7 * m + 114) / 31);
+  const day = ((h + L - 7 * m + 114) % 31) + 1;
+  // Pasqua + 1 giorno = Pasquetta
+  const easter = new Date(year, month - 1, day);
+  easter.setDate(easter.getDate() + 1);
+  return `${String(easter.getMonth()+1).padStart(2,'0')}-${String(easter.getDate()).padStart(2,'0')}`;
+}
+
+function isHoliday(date) {
+  const mmdd = `${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
+  if (FIXED_HOLIDAYS.has(mmdd)) return true;
+  if (easterMondayISO(date.getFullYear()) === mmdd) return true;
+  return false;
+}
+
 /* ========== UTILS ========== */
 const $ = (id) => document.getElementById(id);
 const pad = (n) => String(n).padStart(2, '0');
@@ -428,7 +475,7 @@ function renderCalendar() {
     cell.textContent = d;
 
     const isTooSoon = startOfDay(date) < minBookable;
-    const isClosed  = isDayClosed(date);
+    const isClosed  = isDayClosed(date) || isHoliday(date);
     const isBooked  = state.bookedDates.has(iso);
     const isToday   = startOfDay(date).getTime() === today.getTime();
 
@@ -581,6 +628,7 @@ $('btnConferma').addEventListener('click', async () => {
     telefono: $('telefono').value.trim(),
     targa:    $('targa').value.trim().toUpperCase(),
     km:       $('km').value.trim(),
+    autoSostitutiva: $('autoSostitutiva').checked,
     note:     $('note').value.trim(),
     data:     state.selectedDate,
     slot:     state.selectedSlot,
