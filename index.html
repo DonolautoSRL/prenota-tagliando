@@ -214,6 +214,14 @@
           <label class="lbl block mb-1.5" for="km">Chilometri</label>
           <input id="km" type="number" class="field" placeholder="75000" min="0" required>
         </div>
+        <div>
+          <label class="lbl block mb-1.5" for="marca">Marca</label>
+          <input id="marca" class="field" placeholder="Fiat, Volkswagen, Tesla…" required>
+        </div>
+        <div>
+          <label class="lbl block mb-1.5" for="modello">Modello</label>
+          <input id="modello" class="field" placeholder="Panda, Golf, Model Y…" required>
+        </div>
       </div>
 
       <div class="mt-4">
@@ -347,7 +355,7 @@
    Dopo aver creato lo script Apps Script (vedi README),
    sostituisci il valore qui sotto con l'URL della Web App.
    ============================================================ */
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw00DKVvo58LUdVUGPdvTvNSUErIiEMqUZIxoVQKx78qaLOFsVJVM6yWhQe8QAw-hcF/exec';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwR9wjO86WYky6xgnvA6F5PuM98NbhUgyJLZxw5ksZ-Nxnpp4773d-jNX8svw8EXd8MEA/exec';
 
 /* ========== STATO ========== */
 const state = {
@@ -570,7 +578,7 @@ function updateSummary() {
 
 /* ========== VALIDAZIONE ========== */
 function isFormValid() {
-  const reqIds = ['nome','cognome','email','telefono','targa','km'];
+  const reqIds = ['nome','cognome','email','telefono','targa','km','marca','modello'];
   for (const id of reqIds) {
     const v = ($(id).value || '').trim();
     if (!v) return false;
@@ -581,7 +589,7 @@ function isFormValid() {
 }
 
 // Feedback visivo sui campi
-['nome','cognome','email','telefono','targa','km'].forEach(id => {
+['nome','cognome','email','telefono','targa','km','marca','modello'].forEach(id => {
   const el = $(id);
   el.addEventListener('blur', () => {
     const v = (el.value || '').trim();
@@ -628,6 +636,8 @@ $('btnConferma').addEventListener('click', async () => {
     telefono: $('telefono').value.trim(),
     targa:    $('targa').value.trim().toUpperCase(),
     km:       $('km').value.trim(),
+    marca:    $('marca').value.trim(),
+    modello:  $('modello').value.trim(),
     autoSostitutiva: $('autoSostitutiva').checked,
     note:     $('note').value.trim(),
     data:     state.selectedDate,
@@ -674,7 +684,7 @@ function showSuccess(payload) {
   $('successRecap').innerHTML   = `
     ${fmtDateHuman(payload.data)}<br>
     <span class="text-red">ore ${payload.slot}</span><br>
-    <span class="text-sm text-muted font-normal">${payload.targa} · ${kmFmt} km</span>
+    <span class="text-sm text-muted font-normal">${payload.marca} ${payload.modello} · ${payload.targa} · ${kmFmt} km</span>
   `;
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
