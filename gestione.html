@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Gestione · Donolauto</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: { extend: {
+      colors: {
+        ink:'#0A0A0A', muted:'#6B6B6B', line:'#E5E5E5', soft:'#F5F5F4',
+        red:'#D63B27', redDk:'#A52A1A', green:'#1E9E4A', amber:'#D97706',
+      },
+      fontFamily: { sans: ['Manrope','system-ui','sans-serif'] },
+    }}
+  }
+</script>
+<style>
+  body { font-family:'Manrope',sans-serif; color:#0A0A0A; background:#FAFAF9; -webkit-font-smoothing:antialiased; }
+
+  .card { background:#FFF; border:1px solid #E5E5E5; border-radius:14px; }
+  .pad  { padding:1.25rem; }
+  @media (min-width:768px) { .pad { padding:1.75rem; } }
+
+  .field {
+    width:100%; background:#FFF; border:1px solid #E5E5E5;
+    padding:.7rem .85rem; font-family:inherit; font-size:1rem;
+    color:#0A0A0A; border-radius:8px; outline:none;
+    transition:border-color .15s, box-shadow .15s;
+  }
+  .field:focus { border-color:#0A0A0A; box-shadow:0 0 0 3px rgba(10,10,10,.08); }
+
+  .btn-primary {
+    background:#D63B27; color:#FFF; padding:.8rem 1.4rem; border-radius:8px;
+    font-weight:700; font-size:.95rem; transition:background .15s; cursor:pointer; border:none;
+    display:inline-flex; align-items:center; justify-content:center; gap:.5rem;
+  }
+  .btn-primary:hover:not(:disabled) { background:#A52A1A; }
+  .btn-primary:disabled { background:#D6D6D5; cursor:not-allowed; }
+  .btn-secondary {
+    background:#0A0A0A; color:#FFF; padding:.6rem 1.1rem; border-radius:8px;
+    font-weight:600; font-size:.85rem; cursor:pointer; border:none;
+  }
+  .btn-secondary:hover { background:#333; }
+  .btn-ghost {
+    background:transparent; padding:.45rem .8rem; font-size:.85rem; color:#3A3A3A;
+    border:1px solid #E5E5E5; border-radius:8px; cursor:pointer; transition:all .15s;
+  }
+  .btn-ghost:hover:not(:disabled) { border-color:#0A0A0A; }
+  .btn-ghost:disabled { opacity:.3; cursor:not-allowed; }
+  .btn-danger {
+    background:transparent; color:#D63B27; border:1px solid #D63B27;
+    padding:.45rem .85rem; border-radius:8px; font-size:.82rem; font-weight:600; cursor:pointer;
+    transition:all .15s;
+  }
+  .btn-danger:hover { background:#D63B27; color:#FFF; }
+
+  /* Calendario multi-select per blocchi */
+  .day {
+    aspect-ratio:1/1; display:flex; align-items:center; justify-content:center;
+    font-weight:500; font-size:.9rem; border:1px solid transparent;
+    border-radius:8px; transition:all .15s; cursor:pointer; user-select:none;
+  }
+  .day.off { color:#C9C9C8; cursor:not-allowed; }
+  .day.booked { color:#9A9A99; cursor:not-allowed; background:#F5F5F4; }
+  .day.booked::after { content:''; position:absolute; }
+  .day.available { background:#FFF; border-color:#E5E5E5; color:#0A0A0A; }
+  .day.available:hover { border-color:#D63B27; }
+  .day.selected { background:#0A0A0A; color:#FFF; border-color:#0A0A0A; }
+
+  /* Tag */
+  .tag { display:inline-block; padding:2px 8px; font-size:.7rem; font-weight:700; border-radius:4px; letter-spacing:.04em; }
+  .tag-red { background:#FEE4DF; color:#A52A1A; }
+  .tag-amber { background:#FEF3C7; color:#92400E; }
+  .tag-green { background:#DCFCE7; color:#166534; }
+  .tag-grey { background:#F1F1F1; color:#6B6B6B; }
+
+  /* Modal */
+  .overlay {
+    position:fixed; inset:0; background:rgba(10,10,10,.55);
+    display:flex; align-items:center; justify-content:center; z-index:50; padding:1rem;
+    animation: fadeIn .2s ease;
+  }
+  @keyframes fadeIn { from {opacity:0;} to {opacity:1;} }
+  .modal {
+    background:#FFF; border-radius:14px; max-width:520px; width:100%;
+    max-height:90vh; overflow-y:auto;
+  }
+
+  /* Spinner */
+  .spinner {
+    width:18px; height:18px; border:2px solid rgba(0,0,0,.15);
+    border-top-color:#0A0A0A; border-radius:50%; animation:spin .7s linear infinite;
+    display:inline-block; vertical-align:middle;
+  }
+  @keyframes spin { to { transform:rotate(360deg); } }
+
+  /* Fade up */
+  @keyframes fadeUp { from {opacity:0; transform:translateY(6px);} to {opacity:1; transform:none;} }
+  .fade-up { animation: fadeUp .35s ease both; }
+
+  ::-webkit-scrollbar { width:10px; }
+  ::-webkit-scrollbar-thumb { background:#D6D6D5; border-radius:5px; }
+</style>
+</head>
+<body class="min-h-screen">
+
+<!-- HEADER -->
+<header class="bg-white border-b border-line">
+  <div class="max-w-5xl mx-auto px-5 md:px-8 py-4 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-lg bg-ink flex items-center justify-center">
+        <span class="text-white font-extrabold text-lg leading-none">D</span>
+      </div>
+      <div class="leading-tight">
+        <div class="font-bold text-base">Donolauto</div>
+        <div class="text-[0.68rem] text-muted">Gestione tagliandi</div>
+      </div>
+    </div>
+    <button id="btnLogout" class="btn-ghost hidden">Esci</button>
+  </div>
+</header>
+
+<!-- VIEW LOGIN -->
+<section id="loginView" class="max-w-md mx-auto px-5 md:px-8 py-16 fade-up">
+  <div class="card pad">
+    <div class="inline-block px-3 py-1 rounded-full bg-red/10 text-red text-xs font-semibold tracking-wide mb-4">
+      AREA RISERVATA
+    </div>
+    <h1 class="text-2xl md:text-3xl font-extrabold mb-2">Accesso gestione</h1>
+    <p class="text-sm text-muted mb-6">Inserisci il PIN amministratore per accedere.</p>
+    <div>
+      <label class="text-xs font-semibold text-graphite block mb-1.5" for="pin">PIN</label>
+      <input id="pin" type="password" class="field" placeholder="••••••••" autofocus>
+    </div>
+    <button id="btnLogin" class="btn-primary mt-5 w-full">
+      <span id="loginLabel">Entra</span>
+    </button>
+    <p id="loginError" class="hidden text-xs text-red mt-3"></p>
+  </div>
+</section>
+
+<!-- VIEW DASHBOARD -->
+<main id="dashboardView" class="hidden max-w-5xl mx-auto px-5 md:px-8 py-8">
+
+  <!-- Toolbar -->
+  <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-6">
+    <div>
+      <h1 class="text-2xl md:text-3xl font-extrabold leading-tight">Prossimi appuntamenti</h1>
+      <p class="text-sm text-muted" id="dashSummary">Caricamento…</p>
+    </div>
+    <div class="flex gap-2">
+      <button id="btnRefresh" class="btn-ghost" title="Ricarica">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:-2px;margin-right:4px"><polyline points="23 4 23 10 17 10"/><path d="M3.51 15a9 9 0 0 0 14.85 3.36L23 14"/><polyline points="1 20 1 14 7 14"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10"/></svg>
+        Aggiorna
+      </button>
+      <button id="btnBlock" class="btn-secondary">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:-2px;margin-right:4px"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        Blocca giorni
+      </button>
+    </div>
+  </div>
+
+  <!-- Lista appuntamenti -->
+  <div id="appuntamentiList" class="space-y-3"></div>
+
+  <!-- Stato vuoto -->
+  <div id="emptyState" class="hidden card pad text-center py-12">
+    <div class="text-4xl mb-2">📅</div>
+    <h3 class="font-bold text-lg mb-1">Nessun appuntamento futuro</h3>
+    <p class="text-sm text-muted">Le prenotazioni in arrivo compariranno qui.</p>
+  </div>
+
+  <!-- Sezione Blocchi -->
+  <div id="blocchiSection" class="hidden mt-10">
+    <h2 class="text-lg font-bold mb-3">Giorni bloccati</h2>
+    <div id="blocchiList" class="space-y-2"></div>
+  </div>
+</main>
+
+<!-- MODAL: ANNULLA PRENOTAZIONE -->
+<div id="modalCancel" class="overlay hidden">
+  <div class="modal pad">
+    <h3 class="text-xl font-bold mb-2">Annullare la prenotazione?</h3>
+    <div id="modalCancelInfo" class="bg-soft rounded-lg p-3 mb-4 text-sm"></div>
+    <p class="text-sm text-muted mb-5 leading-relaxed">
+      Verrà eliminata dal calendario e inviata <strong class="text-ink">una email di scuse al cliente</strong>. Non è reversibile.
+    </p>
+    <div class="flex gap-2 justify-end">
+      <button id="btnCancelAbort" class="btn-ghost">Indietro</button>
+      <button id="btnCancelConfirm" class="btn-primary">
+        <span id="btnCancelLabel">Conferma annullamento</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: BLOCCA GIORNI -->
+<div id="modalBlock" class="overlay hidden">
+  <div class="modal pad">
+    <h3 class="text-xl font-bold mb-1">Blocca giorni</h3>
+    <p class="text-sm text-muted mb-4">Seleziona uno o più giorni (es. ferie). Saranno oscurati nel calendario clienti.</p>
+
+    <!-- Navigazione mese -->
+    <div class="flex items-center justify-between mb-3">
+      <button id="blockPrev" class="btn-ghost text-xs">←</button>
+      <div id="blockMonthLabel" class="font-bold capitalize text-sm"></div>
+      <button id="blockNext" class="btn-ghost text-xs">→</button>
+    </div>
+
+    <!-- Intestazione giorni -->
+    <div class="grid grid-cols-7 gap-1 mb-1 text-[0.62rem] font-semibold text-muted text-center">
+      <div>LUN</div><div>MAR</div><div>MER</div><div>GIO</div><div>VEN</div><div>SAB</div><div>DOM</div>
+    </div>
+    <div id="blockGrid" class="grid grid-cols-7 gap-1"></div>
+
+    <div class="mt-4">
+      <label class="text-xs font-semibold text-graphite block mb-1.5">Motivo (facoltativo)</label>
+      <input id="blockMotivo" class="field" placeholder="Es. Ferie agosto">
+    </div>
+
+    <div id="blockSelectionInfo" class="text-xs text-muted mt-3">Nessun giorno selezionato</div>
+
+    <div class="flex gap-2 justify-end mt-5">
+      <button id="btnBlockAbort" class="btn-ghost">Annulla</button>
+      <button id="btnBlockConfirm" class="btn-primary" disabled>
+        <span id="btnBlockLabel">Blocca</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast" class="hidden fixed bottom-6 left-1/2 -translate-x-1/2 bg-ink text-white px-5 py-3 rounded-lg shadow-xl z-[60] max-w-sm text-sm font-medium"></div>
+
+<script>
+/* ============================================================
+   CONFIGURAZIONE BACKEND
+   Stesso URL Apps Script della pagina di prenotazione.
+   ============================================================ */
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwR9wjO86WYky6xgnvA6F5PuM98NbhUgyJLZxw5ksZ-Nxnpp4773d-jNX8svw8EXd8MEA/exec';
+
+/* ========== STATO ========== */
+const state = {
+  pin: null,
+  appuntamenti: [],
+  blocchi: [],
+  blockMonth: new Date(),
+  blockSelected: new Set(),  // set di ISO da bloccare
+  bookedDates: new Set(),    // date già occupate (per non doppio-bloccare)
+  cancelTarget: null,
+};
+
+const MESI = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
+
+/* ========== UTILS ========== */
+const $ = (id) => document.getElementById(id);
+const pad = (n) => String(n).padStart(2,'0');
+const fmtDateISO = (d) => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const parseDateISO = (iso) => { const [y,m,d] = iso.split('-').map(Number); return new Date(y, m-1, d); };
+const fmtDateHuman = (iso) => {
+  const d = parseDateISO(iso);
+  const g = ['domenica','lunedì','martedì','mercoledì','giovedì','venerdì','sabato'];
+  return `${g[d.getDay()]} ${d.getDate()} ${MESI[d.getMonth()].toLowerCase()} ${d.getFullYear()}`;
+};
+const fmtDateShort = (iso) => {
+  const d = parseDateISO(iso);
+  return `${d.getDate()} ${MESI[d.getMonth()].slice(0,3).toLowerCase()}`;
+};
+const startOfDay = (d) => { const x = new Date(d); x.setHours(0,0,0,0); return x; };
+const escapeHtml = (s) => String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c]));
+
+function showToast(msg, type='info') {
+  const t = $('toast');
+  t.textContent = msg;
+  t.classList.remove('hidden');
+  setTimeout(() => t.classList.add('hidden'), 3500);
+}
+
+/* ========== LOGIN ========== */
+async function tryLogin(pinAttempt) {
+  $('loginLabel').innerHTML = '<span class="spinner"></span> Verifica…';
+  $('btnLogin').disabled = true;
+  $('loginError').classList.add('hidden');
+
+  try {
+    const res = await fetch(`${APPS_SCRIPT_URL}?action=adminList&pin=${encodeURIComponent(pinAttempt)}`);
+    const data = await res.json();
+    if (data && data.success) {
+      state.pin = pinAttempt;
+      sessionStorage.setItem('donolauto_admin_pin', pinAttempt);
+      state.appuntamenti = data.appuntamenti || [];
+      enterDashboard();
+    } else {
+      throw new Error(data && data.error ? data.error : 'PIN errato');
+    }
+  } catch (err) {
+    $('loginError').textContent = '❌ ' + (err.message || 'Errore di autenticazione');
+    $('loginError').classList.remove('hidden');
+    $('loginLabel').textContent = 'Entra';
+    $('btnLogin').disabled = false;
+  }
+}
+
+$('btnLogin').addEventListener('click', () => {
+  const pin = $('pin').value.trim();
+  if (!pin) return;
+  tryLogin(pin);
+});
+$('pin').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('btnLogin').click(); });
+
+/* ========== DASHBOARD ========== */
+function enterDashboard() {
+  $('loginView').classList.add('hidden');
+  $('dashboardView').classList.remove('hidden');
+  $('btnLogout').classList.remove('hidden');
+  renderDashboard();
+}
+
+function renderDashboard() {
+  const appts = state.appuntamenti.filter(a => a.tipo === 'prenotazione');
+  const blocchi = state.appuntamenti.filter(a => a.tipo === 'blocco');
+  state.blocchi = blocchi;
+
+  // Date già occupate (per il modal blocco)
+  state.bookedDates = new Set(state.appuntamenti.map(a => a.data));
+
+  // Sommario
+  $('dashSummary').textContent = appts.length === 0
+    ? 'Nessuna prenotazione in arrivo'
+    : `${appts.length} ${appts.length === 1 ? 'prenotazione' : 'prenotazioni'} in arrivo · ${blocchi.length} ${blocchi.length === 1 ? 'giorno bloccato' : 'giorni bloccati'}`;
+
+  // Lista appuntamenti
+  const list = $('appuntamentiList');
+  list.innerHTML = '';
+  if (appts.length === 0) {
+    $('emptyState').classList.remove('hidden');
+  } else {
+    $('emptyState').classList.add('hidden');
+    appts.forEach(a => list.appendChild(renderAppointmentCard(a)));
+  }
+
+  // Lista blocchi
+  if (blocchi.length > 0) {
+    $('blocchiSection').classList.remove('hidden');
+    const blist = $('blocchiList');
+    blist.innerHTML = '';
+    blocchi.forEach(b => blist.appendChild(renderBlockRow(b)));
+  } else {
+    $('blocchiSection').classList.add('hidden');
+  }
+}
+
+function renderAppointmentCard(a) {
+  const card = document.createElement('div');
+  card.className = 'card pad fade-up';
+
+  const phoneCleaned = a.telefono.replace(/\s/g,'');
+  const whatsapp = phoneCleaned.replace(/^\+39/, '').replace(/[^0-9]/g,'');
+  const km = a.km ? Number(a.km).toLocaleString('it-IT') + ' km' : '';
+
+  card.innerHTML = `
+    <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+      <div class="flex-1 min-w-0">
+        <div class="flex flex-wrap items-center gap-2 mb-2">
+          <span class="font-bold text-base">${fmtDateHuman(a.data)}</span>
+          <span class="tag tag-red">ore ${escapeHtml(a.slot)}</span>
+          ${a.autoSost ? '<span class="tag tag-amber">🚗 Auto sost. 35€/g</span>' : ''}
+        </div>
+
+        <div class="text-lg font-extrabold leading-tight mb-0.5">${escapeHtml(a.nome)} ${escapeHtml(a.cognome)}</div>
+        <div class="text-sm text-muted mb-3">
+          <a href="tel:${escapeHtml(phoneCleaned)}" class="text-red font-medium hover:underline">${escapeHtml(a.telefono)}</a>
+          ${whatsapp ? ` · <a href="https://wa.me/39${whatsapp}" target="_blank" class="text-red font-medium hover:underline">WhatsApp</a>` : ''}
+          · <a href="mailto:${escapeHtml(a.email)}" class="hover:underline">${escapeHtml(a.email)}</a>
+        </div>
+
+        <div class="text-sm space-y-0.5">
+          <div><span class="text-muted">Veicolo:</span> <strong>${escapeHtml(a.marca)} ${escapeHtml(a.modello)}</strong></div>
+          <div><span class="text-muted">Targa:</span> <span style="font-family:monospace;letter-spacing:1.5px;">${escapeHtml(a.targa)}</span> ${km ? '· ' + escapeHtml(km) : ''}</div>
+          ${a.note ? `<div class="mt-2 text-muted"><span class="font-semibold text-ink">Note:</span> ${escapeHtml(a.note)}</div>` : ''}
+        </div>
+      </div>
+      <div class="shrink-0">
+        <button class="btn-danger" data-cancel='${JSON.stringify({data:a.data,slot:a.slot,nome:a.nome,cognome:a.cognome,targa:a.targa,email:a.email})}'>
+          Annulla
+        </button>
+      </div>
+    </div>
+  `;
+
+  card.querySelector('[data-cancel]').addEventListener('click', (e) => {
+    state.cancelTarget = JSON.parse(e.currentTarget.getAttribute('data-cancel'));
+    showCancelModal();
+  });
+
+  return card;
+}
+
+function renderBlockRow(b) {
+  const row = document.createElement('div');
+  row.className = 'card pad flex items-center justify-between fade-up';
+  row.style.padding = '0.85rem 1.25rem';
+  row.innerHTML = `
+    <div>
+      <div class="font-semibold">${fmtDateHuman(b.data)}</div>
+      ${b.note ? `<div class="text-xs text-muted mt-0.5">${escapeHtml(b.note)}</div>` : ''}
+    </div>
+    <button class="btn-ghost" data-unblock="${escapeHtml(b.data)}">Sblocca</button>
+  `;
+  row.querySelector('[data-unblock]').addEventListener('click', (e) => {
+    const iso = e.currentTarget.getAttribute('data-unblock');
+    if (confirm(`Sbloccare il giorno ${fmtDateHuman(iso)}?`)) {
+      unblockDay(iso);
+    }
+  });
+  return row;
+}
+
+/* ========== ANNULLA PRENOTAZIONE ========== */
+function showCancelModal() {
+  const t = state.cancelTarget;
+  $('modalCancelInfo').innerHTML = `
+    <div class="font-bold">${fmtDateHuman(t.data)} ore ${escapeHtml(t.slot)}</div>
+    <div class="text-muted">${escapeHtml(t.nome)} ${escapeHtml(t.cognome)} · ${escapeHtml(t.targa)}</div>
+  `;
+  $('modalCancel').classList.remove('hidden');
+}
+$('btnCancelAbort').addEventListener('click', () => $('modalCancel').classList.add('hidden'));
+$('btnCancelConfirm').addEventListener('click', async () => {
+  const t = state.cancelTarget;
+  $('btnCancelLabel').innerHTML = '<span class="spinner"></span> Annullamento…';
+  $('btnCancelConfirm').disabled = true;
+  try {
+    const res = await fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action:'cancel', pin: state.pin, data: t.data, slot: t.slot }),
+    });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error || 'Errore');
+    $('modalCancel').classList.add('hidden');
+    showToast('Prenotazione annullata. Email inviata al cliente.');
+    await refreshData();
+  } catch (err) {
+    showToast('Errore: ' + err.message);
+  } finally {
+    $('btnCancelLabel').textContent = 'Conferma annullamento';
+    $('btnCancelConfirm').disabled = false;
+  }
+});
+
+/* ========== SBLOCCA GIORNO ========== */
+async function unblockDay(iso) {
+  try {
+    const res = await fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action:'unblock', pin: state.pin, data: iso }),
+    });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error || 'Errore');
+    showToast('Giorno sbloccato.');
+    await refreshData();
+  } catch (err) {
+    showToast('Errore: ' + err.message);
+  }
+}
+
+/* ========== BLOCCA GIORNI — MODAL ========== */
+$('btnBlock').addEventListener('click', () => {
+  state.blockSelected.clear();
+  state.blockMonth = new Date();
+  $('blockMotivo').value = '';
+  renderBlockCalendar();
+  updateBlockSelectionInfo();
+  $('modalBlock').classList.remove('hidden');
+});
+$('btnBlockAbort').addEventListener('click', () => $('modalBlock').classList.add('hidden'));
+
+$('blockPrev').addEventListener('click', () => {
+  const now = new Date();
+  const curr = new Date(state.blockMonth.getFullYear(), state.blockMonth.getMonth(), 1);
+  const nowFirst = new Date(now.getFullYear(), now.getMonth(), 1);
+  if (curr <= nowFirst) return;
+  state.blockMonth = new Date(state.blockMonth.getFullYear(), state.blockMonth.getMonth()-1, 1);
+  renderBlockCalendar();
+});
+$('blockNext').addEventListener('click', () => {
+  state.blockMonth = new Date(state.blockMonth.getFullYear(), state.blockMonth.getMonth()+1, 1);
+  renderBlockCalendar();
+});
+
+function renderBlockCalendar() {
+  const month = state.blockMonth.getMonth();
+  const year  = state.blockMonth.getFullYear();
+  $('blockMonthLabel').textContent = `${MESI[month]} ${year}`;
+
+  const now = new Date();
+  const currFirst = new Date(year, month, 1);
+  const nowFirst  = new Date(now.getFullYear(), now.getMonth(), 1);
+  $('blockPrev').disabled = currFirst <= nowFirst;
+
+  const firstDay = new Date(year, month, 1);
+  const lastDay  = new Date(year, month+1, 0);
+  const startOffset = (firstDay.getDay() + 6) % 7;
+  const grid = $('blockGrid');
+  grid.innerHTML = '';
+  for (let i = 0; i < startOffset; i++) grid.appendChild(document.createElement('div'));
+
+  const today = startOfDay(new Date());
+
+  for (let d = 1; d <= lastDay.getDate(); d++) {
+    const date = new Date(year, month, d);
+    const iso  = fmtDateISO(date);
+    const cell = document.createElement('div');
+    cell.className = 'day';
+    cell.textContent = d;
+
+    const isPast   = startOfDay(date) < today;
+    const isBooked = state.bookedDates.has(iso);
+
+    if (isPast) {
+      cell.classList.add('off');
+    } else if (isBooked) {
+      cell.classList.add('booked');
+      cell.title = 'Già occupato';
+    } else {
+      cell.classList.add('available');
+      if (state.blockSelected.has(iso)) cell.classList.add('selected');
+      cell.addEventListener('click', () => {
+        if (state.blockSelected.has(iso)) state.blockSelected.delete(iso);
+        else state.blockSelected.add(iso);
+        renderBlockCalendar();
+        updateBlockSelectionInfo();
+      });
+    }
+    grid.appendChild(cell);
+  }
+}
+
+function updateBlockSelectionInfo() {
+  const n = state.blockSelected.size;
+  const info = $('blockSelectionInfo');
+  if (n === 0) {
+    info.textContent = 'Nessun giorno selezionato';
+    info.className = 'text-xs text-muted mt-3';
+    $('btnBlockConfirm').disabled = true;
+  } else {
+    const list = [...state.blockSelected].sort().map(fmtDateShort).join(', ');
+    info.innerHTML = `<strong class="text-ink">${n} ${n === 1 ? 'giorno selezionato' : 'giorni selezionati'}:</strong> ${list}`;
+    info.className = 'text-xs text-graphite mt-3 leading-relaxed';
+    $('btnBlockConfirm').disabled = false;
+  }
+}
+
+$('btnBlockConfirm').addEventListener('click', async () => {
+  const giorni = [...state.blockSelected].sort();
+  if (giorni.length === 0) return;
+  $('btnBlockLabel').innerHTML = '<span class="spinner"></span> Blocco…';
+  $('btnBlockConfirm').disabled = true;
+  try {
+    const res = await fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({
+        action:'block',
+        pin: state.pin,
+        giorni: giorni,
+        motivo: $('blockMotivo').value.trim() || '',
+      }),
+    });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error || 'Errore');
+    $('modalBlock').classList.add('hidden');
+    const skippedMsg = data.skipped > 0 ? ` (${data.skipped} già occupati)` : '';
+    showToast(`${data.added} ${data.added === 1 ? 'giorno bloccato' : 'giorni bloccati'}${skippedMsg}.`);
+    await refreshData();
+  } catch (err) {
+    showToast('Errore: ' + err.message);
+  } finally {
+    $('btnBlockLabel').textContent = 'Blocca';
+    $('btnBlockConfirm').disabled = false;
+  }
+});
+
+/* ========== REFRESH ========== */
+async function refreshData() {
+  try {
+    const res = await fetch(`${APPS_SCRIPT_URL}?action=adminList&pin=${encodeURIComponent(state.pin)}`);
+    const data = await res.json();
+    if (data.success) {
+      state.appuntamenti = data.appuntamenti || [];
+      renderDashboard();
+    } else {
+      throw new Error(data.error || 'Errore');
+    }
+  } catch (err) {
+    showToast('Errore aggiornamento: ' + err.message);
+  }
+}
+$('btnRefresh').addEventListener('click', refreshData);
+
+/* ========== LOGOUT ========== */
+$('btnLogout').addEventListener('click', () => {
+  sessionStorage.removeItem('donolauto_admin_pin');
+  state.pin = null;
+  state.appuntamenti = [];
+  $('dashboardView').classList.add('hidden');
+  $('btnLogout').classList.add('hidden');
+  $('loginView').classList.remove('hidden');
+  $('pin').value = '';
+  $('pin').focus();
+});
+
+/* ========== AUTO LOGIN (se PIN salvato) ========== */
+window.addEventListener('DOMContentLoaded', () => {
+  const saved = sessionStorage.getItem('donolauto_admin_pin');
+  if (saved) {
+    $('pin').value = saved;
+    tryLogin(saved);
+  }
+});
+</script>
+
+</body>
+</html>
